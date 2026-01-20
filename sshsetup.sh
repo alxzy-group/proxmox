@@ -7,18 +7,16 @@ fi
 
 SSHD_CONFIG="/etc/ssh/sshd_config"
 
-if ! dpkg -l | grep -q openssh-server; then
-    apt update && apt install -y openssh-server
-fi
+apt-get update
+apt-get install -y openssh-server
+
+rm -f /etc/ssh/sshd_config.d/*.conf
 
 update_config() {
     local key=$1
     local value=$2
-    if grep -q "^#\?\s*$key" "$SSHD_CONFIG"; then
-        sed -i "s|^#\?\s*$key.*|$key $value|" "$SSHD_CONFIG"
-    else
-        echo "$key $value" >> "$SSHD_CONFIG"
-    fi
+    sed -i "/^#\?\s*$key/d" "$SSHD_CONFIG"
+    echo "$key $value" >> "$SSHD_CONFIG"
 }
 
 update_config "Port" "22"
@@ -26,6 +24,8 @@ update_config "PermitRootLogin" "yes"
 update_config "PasswordAuthentication" "yes"
 update_config "PubkeyAuthentication" "yes"
 
-systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null
-
-echo "✅ SSH Configured on Port 22"
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl restart ssh || systemctl restart sshd
+else
+    service ssh restart || /etc/init.d/ssh restart
+fi
